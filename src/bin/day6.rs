@@ -1,28 +1,18 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
+
+const SIZE: usize = 14;
 
 pub fn main() {
     let input = include_str!("../inputs/6.txt");
-    let mut window = HashMap::new();
 
-    for (i, c) in input.trim().chars().enumerate() {
-        *window.entry(c).or_insert(0) += 1;
+    let chars: Vec<char> = input.trim().chars().collect();
 
-        if i >= 14 {
-            let cc = input.chars().nth(i-14).unwrap();
-            window.entry(cc).and_modify(|val| *val -= 1);
+    for (i, window) in chars.windows(SIZE).enumerate() {
+        let set: HashSet<&char> = HashSet::from_iter(window.iter());
 
-            if window[&cc] == 0 {
-                window.remove(&cc);
-            }
-
-            let four_uniques = window.iter().all(|(_, v)| {
-                *v == 1
-            });
-
-            if four_uniques {
-                println!("Index: {}", i+1);
-                break;
-            }
+        if set.len() == SIZE {
+            println!("Index: {}", i + SIZE);
+            break;
         }
     }
 }
