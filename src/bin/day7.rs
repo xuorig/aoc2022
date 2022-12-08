@@ -1,7 +1,5 @@
 use std::{cell::RefCell, rc::Rc, str::FromStr};
 
-
-
 fn main() {
     let input = include_str!("../inputs/7.txt");
 
