@@ -1,188 +1,111 @@
-use std::collections::{HashMap, BinaryHeap};
-use std::cmp::Ordering;
+use std::collections::{HashSet, VecDeque};
 
 fn main() {
     let input = include_str!("../inputs/12.txt");
-    part1(input);
-    part2(input);
-}
 
-fn part1(input: &str) {
     let mut grid = vec![];
-    let mut root = (0,0);
-    let mut end = (0,0);
+    let mut start: Coord = (0,0);
 
     for (i, line) in input.lines().enumerate() {
         grid.push(vec![]);
 
         for (j, c) in line.chars().enumerate() {
             if c == 'S' {
-                root = (i, j);
-            }
-            if c == 'E' {
-                end = (i, j);
+                start = (i as i32, j as i32);
             }
             grid[i].push(c);
         }
     }
 
-    let shortest_path = run_astar(root, end, &grid);
-    // Minus the start pos
-    println!("{}", shortest_path.len() - 1);
+    let map = Map::new(grid);
+
+    // PART I
+    let paths_to_end = find_paths(&map, start, 'E', |a,b| { b - a <= 1 });
+    let shortest_path = paths_to_end.iter().map(|p| p.len()).min();
+    // -1 because we don't count the start
+    println!("Shortest path to end: {}", shortest_path.unwrap() - 1);
+
+    // PART 2
+    let end = paths_to_end[0].last().unwrap();
+    let paths_to_as = find_paths(&map, *end, 'a', |a,b| { a - b <= 1 });
+    let shortest_path = paths_to_as.iter().map(|p| p.len()).min();
+    // -1 because we don't count the start
+    println!("Shortest from end to a: {}", shortest_path.unwrap() - 1);
 }
 
-fn part2(input: &str) {
-    let mut grid = vec![];
-    let mut starts = vec![];
-    let mut end = (0,0);
+fn find_paths(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i32) -> bool) -> Vec<Vec<Coord>> {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    let mut paths = Vec::new();
 
-    for (i, line) in input.lines().enumerate() {
-        grid.push(vec![]);
+    queue.push_back(vec![start]);
+    
+    while !queue.is_empty() {
+        let path = queue.pop_front().unwrap();
+        let node = path.last().unwrap();
+        let current_char = map.at(&node);
 
-        for (j, c) in line.chars().enumerate() {
-            if c == 'S' || c == 'a' {
-                starts.push((i, j));
-            }
-            if c == 'E' {
-                end = (i, j);
-            }
-            grid[i].push(c);
-        }
-    }
+        if current_char == end_char {
+            paths.push(path.clone());
+        } else if !visited.contains(node) {
+            for neighbor in map.neighbors(&node) {
+                let our_elevation = elevation(map.at(&node));
+                let elevation = elevation(map.at(&neighbor));
 
-    let shortest = starts.iter().map(|s| run_astar(*s, end, &grid)).filter(|path| path.len() > 0).map(|path| path.len() - 1).min();
-    println!("{:?}", shortest);
-}
-
-fn run_astar(start: Pos, end: Pos, grid: &Vec<Vec<char>>) -> Vec<Pos> {
-    let mut came_from = HashMap::<Pos, Pos>::new();
-
-    let mut cost_so_far = HashMap::<Pos, u32>::new();
-    cost_so_far.insert(start, 0);
-
-    let mut open = BinaryHeap::new();
-    open.push(PosWithPriority {
-        pos: start,
-        priority: 0,
-    });
-
-
-    while !open.is_empty() {
-        let current = open.pop().unwrap();
-
-        if current.pos == end {
-            return reconstruct_path(end, &came_from);
-        }
-
-        for neighbor in accessible_neighbors(&grid, current.pos) {
-            let new_cost = cost_so_far.get(&current.pos).unwrap() + 1;
-            let neighbhor_cost = cost_so_far.get(&neighbor);
-
-            if neighbhor_cost.is_none() || &new_cost < neighbhor_cost.unwrap() {
-                cost_so_far.insert(neighbor, new_cost);
-                let priority = new_cost + heuristic(neighbor, end) as u32;
-                open.push(PosWithPriority { pos: neighbor, priority });
-                came_from.insert(neighbor, current.pos);
-            }
-        }
-    }
-
-    vec![]
-}
-
-fn reconstruct_path(
-    end: Pos,
-    came_from: &HashMap<Pos, Pos>,
-    ) -> Vec<Pos> {
-    let mut path = vec![];
-    path.push(end);
-
-    let mut current = &end;
-
-    while let Some(next) = came_from.get(&current) {
-        current = next;
-        path.push(next.clone());
-    }
-
-    path.reverse();
-    path
-}
-
-
-// Manhattan distance
-pub fn heuristic(a: Pos, b: Pos) -> i32 {
-    let x1: i32 = a.0.try_into().unwrap();
-    let y1: i32 = a.1.try_into().unwrap();
-    let x2: i32 = b.0.try_into().unwrap();
-    let y2: i32 = b.1.try_into().unwrap();
-    i32::abs(x1 - x2) + i32::abs(y1 - y2)
-}
-
-pub fn accessible_neighbors(grid: &Vec<Vec<char>>, pos: Pos) -> Vec<Pos> {
-    let neighbor_deltas: Vec<(i32, i32)> = vec![
-        (0, -1),
-        (0, 1),
-        (-1, 0),
-        (1, 0),
-    ];
-
-    let mut result = vec![];
-
-    for (i, j) in &neighbor_deltas {
-        let neighbor_location = (pos.0 as i32 + i, pos.1 as i32 + j);
-
-        let inbounds = neighbor_location.0 >= 0
-            && neighbor_location.0 < grid.len().try_into().unwrap()
-            && neighbor_location.1 >= 0
-            && neighbor_location.1 < grid[0].len().try_into().unwrap();
-
-        if inbounds {
-            let x: usize = neighbor_location.0.try_into().unwrap();
-            let y: usize = neighbor_location.1.try_into().unwrap();
-
-            let neighbor_char = grid[x][y];
-            let our_char = grid[pos.0][pos.1];
-
-            if neighbor_char == 'E' {
-                if our_char == 'z' {
-                    result.push((x, y));
+                if is_accessible(our_elevation, elevation) {
+                    let mut new_path = path.clone();
+                    new_path.push(neighbor.clone());
+                    queue.push_back(new_path);
                 }
-            } else if our_char == 'S' {
-                result.push((x, y));
-            } else if neighbor_char as i8 - our_char as i8 <= 1 {
-                result.push((x, y));
             }
+
+            visited.insert(node.clone());
         }
     }
 
-    result
+    return paths;
 }
 
-type Pos = (usize, usize);
+fn elevation(c: char) -> i32 {
+  match c {
+      'S' => 0,
+      'E' => 26,
+      _ => (1 + c as u8 - b'a').into()
 
-#[derive(Debug)]
-struct PosWithPriority {
-    pos: Pos,
-    priority: u32
+  }
 }
 
+type Coord = (i32, i32);
 
-impl Ord for PosWithPriority {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.priority.cmp(&other.priority).reverse()
+struct Map {
+    grid: Vec<Vec<char>>,
+}
+
+impl Map {
+    fn new(grid: Vec<Vec<char>>) -> Self {
+        Self { grid }
+    }
+
+    fn neighbors(&self, coord: &Coord) -> Vec<Coord> {
+        vec![
+            (coord.0 + 1, coord.1),
+            (coord.0 - 1, coord.1),
+            (coord.0, coord.1 + 1),
+            (coord.0, coord.1 - 1),
+        ]
+            .iter()
+            .filter(|c| self.inbounds(c))
+            .copied()
+            .collect()
+
+    }
+
+    fn inbounds(&self, coord: &Coord) -> bool {
+        (coord.0 >= 0 && coord.0 < self.grid.len() as i32) &&
+            (coord.1 >= 0 && coord.1 < self.grid[0].len() as i32)
+    }
+
+    fn at(&self, coord: &Coord) -> char {
+        self.grid[coord.0 as usize][coord.1 as usize]
     }
 }
-
-impl PartialOrd for PosWithPriority {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for PosWithPriority {
-    fn eq(&self, other: &Self) -> bool {
-        self.priority == other.priority
-    }
-}
-
-impl Eq for PosWithPriority {}
