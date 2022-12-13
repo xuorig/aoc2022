@@ -20,20 +20,16 @@ fn main() {
     let map = Map::new(grid.clone());
 
     // PART I
-    let paths_to_end = find_paths(&map, start, 'E', |a,b| { b - a <= 1 });
-    let shortest_path = paths_to_end.iter().map(|p| p.len()).min();
-    println!("Shortest path to end: {}", shortest_path.unwrap() - 1);
+    let shortest_path_from_start = shortest_path(&map, start, 'E', |a,b| { b - a <= 1 }).expect("Expected to find a path");
+    println!("Shortest path to end: {}", shortest_path_from_start.len() - 1);
 
     // PART 2
-    let end = paths_to_end[0].last().unwrap();
-    let paths_to_as = find_paths(&map, *end, 'a', |a,b| { a - b <= 1 });
-    let shortest_path = paths_to_as.iter().map(|p| p.len()).min();
-    println!("Shortest from end to a: {}", shortest_path.unwrap() - 1);
+    let end = shortest_path_from_start.last().unwrap();
+    let shortest_path_from_end = shortest_path(&map, *end, 'a', |a,b| { a - b <= 1 }).expect("Expected to find a path");
+    println!("Shortest from end to a: {}", shortest_path_from_end.len()- 1);
 
     // Just for fun
-    let mut paths_to_end = paths_to_end.clone();
-    paths_to_end.sort_by(|a ,b| a.len().partial_cmp(&b.len()).unwrap());
-    let shortest_path = HashSet::from_iter(paths_to_end.first().unwrap().iter().copied());
+    let shortest_path = HashSet::from_iter(shortest_path_from_start.iter().copied());
     print_path(shortest_path, grid.clone());
 }
 
@@ -53,10 +49,9 @@ fn print_path(path: HashSet<Coord>, grid: Vec<Vec<char>>) {
     println!("\x1b[0m"); // clear color
 }
 
-fn find_paths(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i32) -> bool) -> Vec<Vec<Coord>> {
+fn shortest_path(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i32) -> bool) -> Option<Vec<Coord>> {
     let mut visited = HashSet::new();
     let mut queue = VecDeque::new();
-    let mut paths = Vec::new();
 
     queue.push_back(vec![start]);
     
@@ -66,7 +61,7 @@ fn find_paths(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i3
         let current_char = map.at(&node);
 
         if current_char == end_char {
-            paths.push(path.clone());
+            return Some(path.clone())
         } else if !visited.contains(node) {
             for neighbor in map.neighbors(&node) {
                 let our_elevation = elevation(map.at(&node));
@@ -83,7 +78,7 @@ fn find_paths(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i3
         }
     }
 
-    return paths;
+    return None
 }
 
 fn elevation(c: char) -> i32 {
