@@ -17,20 +17,40 @@ fn main() {
         }
     }
 
-    let map = Map::new(grid);
+    let map = Map::new(grid.clone());
 
     // PART I
     let paths_to_end = find_paths(&map, start, 'E', |a,b| { b - a <= 1 });
     let shortest_path = paths_to_end.iter().map(|p| p.len()).min();
-    // -1 because we don't count the start
     println!("Shortest path to end: {}", shortest_path.unwrap() - 1);
 
     // PART 2
     let end = paths_to_end[0].last().unwrap();
     let paths_to_as = find_paths(&map, *end, 'a', |a,b| { a - b <= 1 });
     let shortest_path = paths_to_as.iter().map(|p| p.len()).min();
-    // -1 because we don't count the start
     println!("Shortest from end to a: {}", shortest_path.unwrap() - 1);
+
+    // Just for fun
+    let mut paths_to_end = paths_to_end.clone();
+    paths_to_end.sort_by(|a ,b| a.len().partial_cmp(&b.len()).unwrap());
+    let shortest_path = HashSet::from_iter(paths_to_end.first().unwrap().iter().copied());
+    print_path(shortest_path, grid.clone());
+}
+
+fn print_path(path: HashSet<Coord>, grid: Vec<Vec<char>>) {
+    for i in 0..grid.len() {
+        for j in 0..grid[0].len() {
+            let c = grid[i][j];
+            if path.contains(&(i.try_into().unwrap() ,j.try_into().unwrap())) {
+                print!("\u{1b}[38;5;{}m{} ", 244, "*");
+            } else {
+                let color = elevation(c) % 256 + 17;
+                print!("\u{1b}[38;5;{}m{} ", color, c);
+            }
+        }
+        println!();
+    }
+    println!("\x1b[0m"); // clear color
 }
 
 fn find_paths(map: &Map, start: Coord, end_char: char, is_accessible: fn(i32, i32) -> bool) -> Vec<Vec<Coord>> {
@@ -71,7 +91,6 @@ fn elevation(c: char) -> i32 {
       'S' => 0,
       'E' => 26,
       _ => (1 + c as u8 - b'a').into()
-
   }
 }
 
