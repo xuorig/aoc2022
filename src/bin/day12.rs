@@ -85,7 +85,7 @@ fn elevation(c: char) -> i32 {
   match c {
       'S' => 0,
       'E' => 26,
-      _ => (1 + c as u8 - b'a').into()
+      _ => (c as u8 - b'a').into()
   }
 }
 
@@ -121,5 +121,18 @@ impl Map {
 
     fn at(&self, coord: &Coord) -> char {
         self.grid[coord.0 as usize][coord.1 as usize]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::elevation;
+
+    #[test]
+    fn elevation_test() {
+        assert_eq!(elevation('S'), 0);
+        assert_eq!(elevation('a'), 0);
+        assert_eq!(elevation('z'), 25);
+        assert_eq!(elevation('E'), 26);
     }
 }
