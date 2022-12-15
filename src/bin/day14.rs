@@ -1,23 +1,25 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::{Write, self}, time, fmt};
 use colored::*;
+use termion::{raw::IntoRawMode, clear, cursor, screen::IntoAlternateScreen};
 
 fn main() {
     let input = include_str!("../inputs/14.txt");
-    println!("Sand Units: {}", part1(input));
-    println!("Sand Units 2: {}", part2(input));
+    //println!("Sand Units: {}", part1(input));
+    //println!("Sand Units 2: {}", part2(input));
+    let mut cave = Cave::from_traces(input, false);
+    cave.animate();
 }
 
 fn part1(input: &str) -> u64 {
     let mut cave = Cave::from_traces(input, false);
     let units = cave.fill();
-    cave.print();
     return units;
 }
 
 fn part2(input: &str) -> u64 {
     let mut cave = Cave::from_traces(input, true);
     let units = cave.fill();
-    cave.print();
+    println!("{:?}", cave.bounds);
     return units;
 }
 
@@ -44,7 +46,7 @@ impl Cave {
                 let y = coords.next().unwrap().parse::<i32>().unwrap();
 
                 left = i32::min(left, x);
-                right = i32::max(left, x);
+                right = i32::max(right, x);
                 bottom = i32::max(bottom, y);
 
                 (x, y)
@@ -66,6 +68,87 @@ impl Cave {
             sand_moves: vec![(0,1),(-1,1),(1,1)]
         }
     }
+    
+    fn animate(&mut self) {
+        let mut stdout = std::io::stdout().into_raw_mode().unwrap().into_alternate_screen().unwrap();
+
+        write!(
+            stdout,
+            "{clear}{goto}{cave}{hide}",
+            clear = clear::All,
+            goto = cursor::Goto(1, 1),
+            cave = self,
+            hide = cursor::Hide,
+            )
+            .unwrap();
+
+        stdout.flush().unwrap();
+
+        loop {
+            let mut current = (500, 0);
+
+            if !self.is_free(&current) {
+                break
+            }
+
+            loop {
+                if current.1 >= self.bounds.bottom {
+                    return
+                }
+
+                let move_to = self.sand_moves
+                    .iter()
+                    .map(|m| (current.0 + m.0, current.1 + m.1))
+                    .find(|p| self.is_free(p));
+
+                match move_to {
+                    Some(new_position) => {
+                        let x: u16 = (current.0 - self.bounds.left + 1).try_into().unwrap();
+                        let y: u16 = (current.1 + 1).try_into().unwrap();
+
+                        write!(
+                            stdout,
+                            "{goto}{c}{hide}",
+                            goto = cursor::Goto(x, y),
+                            c = ".".white(),
+                            hide = cursor::Hide,
+                            )
+                            .unwrap();
+
+                        let x: u16 = (new_position.0 - self.bounds.left + 1).try_into().unwrap();
+                        let y: u16 = (new_position.1 + 1).try_into().unwrap();
+
+                        write!(
+                            stdout,
+                            "{goto}{c}{hide}",
+                            goto = cursor::Goto(x, y),
+                            c = "~".yellow(),
+                            hide = cursor::Hide,
+                            )
+                            .unwrap();
+                        current = new_position;
+                    }
+                    None => {
+                        self.rest(current.clone());
+                        let x: u16 = (current.0 - self.bounds.left + 1).try_into().unwrap();
+                        let y: u16 = (current.1 + 1).try_into().unwrap();
+                        write!(
+                            stdout,
+                            "{goto}{c}{hide}",
+                            goto = cursor::Goto(x, y),
+                            c = "o".red(),
+                            hide = cursor::Hide,
+                            )
+                            .unwrap();
+                        break;
+                    },
+                }
+
+                stdout.flush().unwrap();
+                std::thread::sleep(std::time::Duration::from_micros(500));
+            }
+        }
+    }
 
     fn fill(&mut self) -> u64 {
         let mut sand_units = 0;
@@ -76,13 +159,14 @@ impl Cave {
     }
 
     fn produce_sand(&mut self) -> bool {
+
         let mut current = (500, 0);
 
-        loop {
-            if !self.is_free(&current) {
-                return false
-            }
+        if !self.is_free(&current) {
+            return false
+        }
 
+        loop {
             if current.1 >= self.bounds.bottom {
                 return false;
             }
@@ -93,7 +177,9 @@ impl Cave {
                 .find(|p| self.is_free(p));
 
             match move_to {
-                Some(new_position) => current = new_position,
+                Some(new_position) => {
+                    current = new_position;
+                }
                 None => {
                     self.rest(current.clone());
                     return true
@@ -145,33 +231,36 @@ impl Cave {
 
     fn rest(&mut self, coord: Coord) {
         self.map.insert(coord, ScanItem::Sand);
-        self.bounds.left = i32::min(self.bounds.left, coord.0);
-        self.bounds.right = i32::max(self.bounds.right, coord.0);
     }
+}
 
-    fn print(&self) {
+impl fmt::Display for Cave {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for y in 0..self.bounds.bottom + 1 {
-            for x in self.bounds.left - 1..self.bounds.right + 2 {
+            for x in self.bounds.left..self.bounds.right + 1 {
                 match self.map.get(&(x, y)) {
                     Some(item) => match item {
-                        ScanItem::Rock => print!("{}", "#".blue()),
-                        ScanItem::Sand => print!("{}", "O".yellow()),
+                        ScanItem::Rock => write!(f, "{}", "#".green())?,
+                        ScanItem::Sand => write!(f, "{}", "O".yellow())?,
                     },
                     None => {
                         if self.has_floor && y == self.bounds.bottom {
-                            print!("{}", "#".blue())
+                            write!(f, "{}", "#".green())?
                         } else {
-                            print!("{}", ".".black())
+                            write!(f, "{}", ".".white())?
                         }
                     },
                 }
             }
 
-            println!();
+            write!(f, "\n\r")?;
         }
+        Ok(())
     }
 }
 
+
+#[derive(Debug)]
 struct MapBounds {
     left: i32,
     right: i32,
@@ -182,7 +271,7 @@ struct MapBounds {
 #[derive(Debug)]
 enum ScanItem {
     Rock,
-    Sand
+    Sand,
 }
 
 type Coord = (i32, i32);

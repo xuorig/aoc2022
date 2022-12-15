@@ -10,3 +10,5 @@ reqwest = { version = "0.11", features = [ "blocking" ] }
 itertools = "0.10"
 nom = "7"
 colored = "2"
+termion = "2"
+rayon = "1.5"
