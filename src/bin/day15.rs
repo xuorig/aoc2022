@@ -8,7 +8,7 @@ use nom::{sequence::{preceded, tuple}, character::complete::digit1, bytes::compl
 fn main() {
     println!("{}", part1());
     println!("{:?}", part2());
-    println!("{:?}", parallel_part_2());
+    //println!("{:?}", parallel_part_2());
 }
 
 const ROW: i64 = 2000000; 
@@ -90,13 +90,13 @@ fn parallel_part_2() {
         .collect();
 
 
-    (0..UPPER_BOUND + 1).into_par_iter().for_each(|y| {
+    (0..UPPER_BOUND + 1).into_par_iter().find_any(|y| {
         let mut x = 0;
 
         while x <= UPPER_BOUND {
             let sensor = ranges
                 .iter()
-                .map(|(sensor, range)| (sensor, man((x,y), *sensor), range))
+                .map(|(sensor, range)| (sensor, man((x,*y), *sensor), range))
                 .find(|(_, distance, range)| distance <= *range)
                 .map(|(sensor, _, range)| (sensor, range));
 
@@ -107,10 +107,14 @@ fn parallel_part_2() {
                 },
                 None => {
                     println!("FOUND: {},{} FREQ: {}", x, y, x * 4000000 + y);
+                    return true
                 },
             }
         }
+
+        false
     });
+
 }
 
 fn man(a: Coord, b: Coord) -> i64 {
